@@ -11,6 +11,55 @@ VPC_ID=$(aws ec2 describe-vpcs \
   --filter Name=tag:Name,Values=$VPC_NAME \
   --query Vpcs[].VpcId --output text)
 
+# Delete Api Gateway resources
+echo "Deleting Api Gateway resources..."
+aws apigateway delete-rest-api \
+  --rest-api-id $API_ID
+
+# Detach policy from IAM role lambda-vpc-access
+echo "Detaching policy from lambda-vpc-access role..."
+aws iam detach-role-policy \
+  --role-name lambda-vpc-access \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+echo "  policy detached."
+
+# Delete IAM role lambda-vpc-access
+echo "Deleting IAM role lambda-vpc-access..."
+aws iam delete-role \
+  --role-name lambda-vpc-access 
+echo "  lambda-vpc-access role deleted."
+
+# Disconnect Lambda function from VPC
+echo "Disconnecting lambda function from VPC..."
+aws lambda update-function-configuration \
+  --function-name lambdaRdsQuery \
+  --vpc-config SubnetIds=[],SecurityGroupIds=[] \
+  --no-cli-pager
+
+# Delete Lambda function 
+echo "Deleting lambda function..."
+aws lambda delete-function \
+  --function-name lambdaRdsQuery
+
+# Delete RDS instance
+echo "Deleting RDS DB instance..."
+aws rds delete-db-instance \
+  --db-instance-identifier lambdaRDS \
+  --skip-final-snapshot \
+  --delete-automated-backups \
+  --no-cli-pager
+
+# Wait for RDS instance to be deleted
+echo "Waiting for RDS DB instance to be deleted..."
+aws rds wait db-instance-deleted \
+  --db-instance-identifier lambdaRDS
+
+# Delete Db Subnet Group
+echo "Deleting Db Subnet Group lambdaRdsSubnetGroup..."
+aws rds delete-db-subnet-group \
+  --db-subnet-group-name lambdaRdsSubnetGroup
+echo "  db subnet group deleted."
+
 # Check VPC state, available or not
 vpc_state=$(aws ec2 describe-vpcs \
     --vpc-ids "${VPC_ID}" \
@@ -23,33 +72,7 @@ if [ ${vpc_state} != 'available' ]; then
     exit 1
 fi
 
-# Get bastion ec2 instance id
-INSTANCE_ID=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=bastion-rds" "Name=instance-state-name,Values=running" \
-  --query "Reservations[].Instances[].InstanceId" \
-  --output text)
-
-echo $INSTANCE_ID
-
-# Terminate bastion ec2 instance
-echo "Terminating ec2 bastion instance..."
-aws ec2 terminate-instances \
-  --instance-ids $INSTANCE_ID 
-
-# Wait for instance to be terminated
-echo "Waiting for ec2 bastion to be terminated..."
-aws ec2 wait instance-terminated \
-  --instance-ids $INSTANCE_ID
-
-# Delete bastion ec2 keypair
-echo "Deleting ec2 keypair..."
-aws ec2 delete-key-pair \
-  --key-name bastion-rds
-
-# Delete key pem file
-rm bastion-rds.pem
-
-echo "=== Deleting the resources in VPC ${VPC_ID} in ${AWS_REGION}..."
+echo -n "=== Deleting the resources in VPC ${VPC_ID} in ${AWS_REGION}..."
 
 # Delete NIC
 echo "Deleting Network Interface ..."
