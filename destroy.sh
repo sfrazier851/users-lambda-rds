@@ -49,6 +49,65 @@ aws ec2 delete-key-pair \
 # Delete key pem file
 rm bastion-rds.pem
 
+# Delete Api Gateway resources
+echo "Deleting Api Gateway resources..."
+aws apigateway delete-rest-api \
+  --rest-api-id $API_ID
+
+# Detach policy from IAM role lambda-vpc-access
+echo "Detaching policy from lambda-vpc-access role..."
+aws iam detach-role-policy \
+  --role-name lambda-vpc-access \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+echo "  policy detached."
+
+# Delete IAM role lambda-vpc-access
+echo "Deleting IAM role lambda-vpc-access..."
+aws iam delete-role \
+  --role-name lambda-vpc-access
+echo "  lambda-vpc-access role deleted."
+
+# Wait for lambda's last update status to be successful
+echo "Waiting for lambda to be ready..."
+aws lambda wait function-updated \
+  --function-name lambdaRdsQuery
+
+# Disconnect Lambda function from VPC
+echo "Disconnecting lambda function from VPC..."
+aws lambda update-function-configuration \
+  --function-name lambdaRdsQuery \
+  --vpc-config SubnetIds=[],SecurityGroupIds=[] \
+  --no-cli-pager
+
+# Wait for lambda's last update status to be successful
+echo "Waiting for lambda to be ready..."
+aws lambda wait function-updated \
+  --function-name lambdaRdsQuery
+
+# Delete Lambda function
+echo "Deleting lambda function..."
+aws lambda delete-function \
+  --function-name lambdaRdsQuery
+
+# Delete RDS instance
+echo "Deleting RDS DB instance..."
+aws rds delete-db-instance \
+  --db-instance-identifier lambdaRDS \
+  --skip-final-snapshot \
+  --delete-automated-backups \
+  --no-cli-pager
+
+# Wait for RDS instance to be deleted
+echo "Waiting for RDS DB instance to be deleted..."
+aws rds wait db-instance-deleted \
+  --db-instance-identifier lambdaRDS
+
+# Delete Db Subnet Group
+echo "Deleting Db Subnet Group lambdaRdsSubnetGroup..."
+aws rds delete-db-subnet-group \
+  --db-subnet-group-name lambdaRdsSubnetGroup
+echo "  db subnet group deleted."
+
 echo "=== Deleting the resources in VPC ${VPC_ID} in ${AWS_REGION}..."
 
 # Delete NIC
