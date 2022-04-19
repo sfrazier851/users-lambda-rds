@@ -19,7 +19,7 @@ Spin up a serverless REST API. Uses API Gateway, Lambda and RDS (MySQL).
 4.  Create AWS Account
 
 6.  Download AWS Access Key ID and AWS Secret Access Key
-    - NOTE: for simplicity, give IAM User/Group with AdministratorAccess (policy).
+    - NOTE: for simplicity, give IAM User/Group AdministratorAccess (policy).
 
 7.  Setup AWS Credentials
     - ```aws configure```
