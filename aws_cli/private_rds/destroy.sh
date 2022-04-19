@@ -47,7 +47,7 @@ aws ec2 delete-key-pair \
   --key-name bastion-rds
 
 # Delete key pem file
-rm bastion-rds.pem
+rm -f bastion-rds.pem
 
 # Delete Api Gateway resources
 echo "Deleting Api Gateway resources..."

@@ -186,9 +186,9 @@ PUBLIC_DNS=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=bastion-rds" "Name=instance-state-name,Values=running" \
   --query "Reservations[].Instances[].PublicDnsName" --output text)
   
-#echo $PUBLIC_DNS
+echo $PUBLIC_DNS
 #echo $MY_IP_ADDRESS
-echo $PRIVATE_IP
+#echo $PRIVATE_IP
 
 # Get Default Security Group
 echo "Getting Default Security Group..."
@@ -261,11 +261,18 @@ RDS_ENDPOINT=$(aws rds describe-db-instances \
   --db-instance-identifier lambdaRDS \
   --query DBInstances[*].Endpoint.Address --output text)
 
-# Get IAM role arn (for Lambda function)
-ROLE_ARN=$(aws iam get-role --role-name lambda-vpc-role  --query 'Role.Arn' --output text)
-
 # Write rds uri endpoint to rds_host.py
 echo "uri_string = \"$RDS_ENDPOINT\"" > ./deploy/rds_host.py
+
+# disable strict host key checking (so script can run non-interactively)
+ssh -i bastion-rds.pem -o "StrictHostKeyChecking no" ubuntu@$PUBLIC_DNS exit
+# copy over sql script
+scp -i bastion-rds.pem db.sql ubuntu@$PUBLIC_DNS:~/
+# run sql script
+ssh -i bastion-rds.pem ubuntu@$PUBLIC_DNS mysql -h $RDS_ENDPOINT  --user=admin --password=supersecret < db.sql
+
+# Get IAM role arn (for Lambda function)
+ROLE_ARN=$(aws iam get-role --role-name lambda-vpc-role  --query 'Role.Arn' --output text)
 
 # Prepare Lambda function zip file
 echo "Preparing Lambda function zip file..."
