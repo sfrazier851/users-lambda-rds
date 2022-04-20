@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#NOTE: this script assumes that mysqlsh is installed.
+
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_REGION="us-east-1"
 VPC_NAME="rds-lambda-apig"
@@ -8,8 +10,10 @@ SUBNET_PUBLIC_CIDR1="10.0.1.0/24"
 SUBNET_PUBLIC_CIDR2="10.0.2.0/24"
 SUBNET_PUBLIC_AZ1="us-east-1a"
 SUBNET_PUBLIC_AZ2="us-east-1b"
-MY_IP_ADDRESS=$(curl https://icanhazip.com)
-
+MY_IP_ADDRESS=$(curl -s https://icanhazip.com)
+RDS_USER="admin"
+RDS_PASSWORD="supersecret"
+RDS_DATABASE_NAME="test"
 
 # Create VPC
 echo "Creating VPC in specified region..."
@@ -163,11 +167,10 @@ aws rds create-db-instance \
   --publicly-accessible \
   --allocated-storage 5 \
   --backup-retention-period 3 \
-  --publicly-accessible \
   --vpc-security-group-ids "$SECURITY_GROUP_ID" \
   --db-subnet-group-name lambdaRdsSubnetGroup \
-  --master-username admin \
-  --master-user-password supersecret \
+  --master-username $RDS_USER \
+  --master-user-password $RDS_PASSWORD \
   --no-cli-pager
 echo "  RDS MySQL instance created."
 
@@ -176,20 +179,28 @@ echo "Waiting for RDS MySQL instance ready..."
 aws rds wait db-instance-available \
   --db-instance-identifier lambdaRDS
 
-# Run SQL script on RDS instance
-echo "Running SQL script against RDS instance..."
-mysqlsh --mysql admin@lambdards.cmowfshfbd4y.us-east-1.rds.amazonaws.com --file db.sql
-
 # Get RDS endpoint address (instance host uri)
 RDS_ENDPOINT=$(aws rds describe-db-instances \
   --db-instance-identifier lambdaRDS \
   --query DBInstances[*].Endpoint.Address --output text)
 
+# Run SQL script on RDS instance
+echo "Running SQL script against RDS instance..."
+mysqlsh --mysql $RDS_USER@$RDS_ENDPOINT --file db.sql
+
+#### CREATE .py config files for lambda to connect to RDS instance ####
+# Write rds uri endpoint to deploy/rds_host.py
+echo "# uri_string =  \"<db-instance-name>.<account-region-specific-hash>.<region-id>.rds.amazonaws.com\"" > ./deploy/rds_host.py
+echo "uri_string = \"$RDS_ENDPOINT\"" >> ./deploy/rds_host.py
+
+# Write rds instance config to deploy/rds_config.py
+echo "#config file containing credentials for RDS MySQL instance" > ./deploy/rds_config.py
+echo "db_username = \"$RDS_USER\"" >> ./deploy/rds_config.py
+echo "db_password = \"$RDS_PASSWORD\"" >> ./deploy/rds_config.py
+echo "db_name = \"$RDS_DATABASE_NAME\"" >> ./deploy/rds_config.py
+
 # Get IAM role arn (for Lambda function)
 ROLE_ARN=$(aws iam get-role --role-name lambda-vpc-role  --query 'Role.Arn' --output text) 
-
-# Write rds uri endpoint to rds_host.py
-echo "uri_string = \"$RDS_ENDPOINT\"" > ./deploy/rds_host.py
 
 # Prepare Lambda function zip file
 echo "Preparing Lambda function zip file..."
