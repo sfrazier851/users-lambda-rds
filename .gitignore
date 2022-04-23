@@ -3,7 +3,7 @@
 # Lambda fn dependencies installed with pip
 deploy/*/*
 # Lambda fn deploy zip
-deploy.zip
+**/*.zip
 
 # ec2 private key for bastion host
 *.pem
