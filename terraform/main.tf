@@ -221,6 +221,14 @@ resource "aws_default_security_group" "default" {
     protocol    = "tcp"
     cidr_blocks = ["${aws_instance.rds_bastion.private_ip}/32"]
   }
+
+  egress {
+    description = ""
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 resource "aws_db_subnet_group" "lambda_rds" {
@@ -365,4 +373,75 @@ resource "null_resource" "delete_deploy_zip" {
 rm deploy.zip && touch empty && zip deploy.zip empty && zip -d deploy.zip empty && rm empty
 EOF
   }
+}
+
+# API Gateway
+resource "aws_api_gateway_rest_api" "lambda_rds" {
+  name = "lambda_rds"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+resource "aws_api_gateway_resource" "lambda_rds_users" {
+  path_part   = "users"
+  parent_id   = aws_api_gateway_rest_api.lambda_rds.root_resource_id
+  rest_api_id = aws_api_gateway_rest_api.lambda_rds.id
+}
+
+resource "aws_api_gateway_method" "get_users" {
+  rest_api_id   = aws_api_gateway_rest_api.lambda_rds.id
+  resource_id   = aws_api_gateway_resource.lambda_rds_users.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_users_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.lambda_rds.id
+  resource_id             = aws_api_gateway_resource.lambda_rds_users.id
+  http_method             = aws_api_gateway_method.get_users.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.rds_lambda.invoke_arn
+}
+
+# Lambda
+resource "aws_lambda_permission" "apigw_lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.rds_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
+  source_arn = "arn:aws:execute-api:us-east-1:486322999195:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.get_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
+}
+
+resource "aws_api_gateway_deployment" "users_deploy" {
+  rest_api_id = aws_api_gateway_rest_api.lambda_rds.id
+
+  triggers = {
+    # NOTE: The configuration below will satisfy ordering considerations,
+    #       but not pick up all future REST API changes. More advanced patterns
+    #       are possible, such as using the filesha1() function against the
+    #       Terraform configuration file(s) or removing the .id references to
+    #       calculate a hash against whole resources. Be aware that using whole
+    #       resources will show a difference after the initial implementation.
+    #       It will stabilize to only change when resources change afterwards.
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_resource.lambda_rds_users.id,
+      aws_api_gateway_method.get_users.id,
+      aws_api_gateway_integration.get_users_integration.id,
+    ]))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "users_stage" {
+  deployment_id = aws_api_gateway_deployment.users_deploy.id
+  rest_api_id   = aws_api_gateway_rest_api.lambda_rds.id
+  stage_name    = "v1"
 }
