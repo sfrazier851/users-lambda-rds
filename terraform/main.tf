@@ -222,12 +222,18 @@ resource "aws_default_security_group" "default" {
     cidr_blocks = ["${aws_instance.rds_bastion.private_ip}/32"]
   }
 
+  ingress {
+      from_port = 0
+      to_port   = 0
+      self      = true
+      protocol  = -1
+    }
+
   egress {
-    description = ""
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+      from_port = 0
+      to_port   = 0
+      self      = true
+      protocol  = -1
   }
 }
 
