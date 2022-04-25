@@ -30,11 +30,12 @@ Spin up a serverless REST API. Uses API Gateway, Lambda and RDS (MySQL).
 -------------------------
 
 ### Run AWS CLI Automation, Test and Teardown
+###### NOTE: ```users-lambda-rds/aws_cli/public_rds``` requires that ```mysqlsh``` is installed on local machine.
 
-1.  Navigate to ```users-lambda-rds/aws_cli/private_rds``` OR ```users-lambda-rds/aws_cli/public_rds```
+1.  Navigate to ```users-lambda-rds/aws_cli/private_rds```
     - ```./deploy.sh```
 
-2.  Wait about 5-10 minutes after script completes.
+2.  Wait about 8-12 minutes after script completes.
 
 3.  Confirm Deployment
     - ```./curl_test.sh```

@@ -14,6 +14,10 @@ SUBNET_PUBLIC_CIDR="10.0.3.0/24"
 SUBNET_PUBLIC_AZ="us-east-1a"
 #MY_IP_ADDRESS=$(curl -s https://ipv4.icanhazip.com)/32
 MY_IP_ADDRESS=0.0.0.0/0
+# rds instance config
+RDS_USER="admin"
+RDS_PASSWORD="supersecret"
+RDS_DATABASE_NAME="test"
 
 # Create VPC
 echo "Creating VPC in specified region..."
@@ -168,7 +172,7 @@ INSTANCE_ID=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=bastion-rds" "Name=instance-state-name,Values=pending" \
   --query "Reservations[].Instances[].InstanceId" --output text)
   
-echo $INSTANCE_ID
+#echo $INSTANCE_ID
 
 # Wait for bastion instance to be running
 echo "Waiting for bastion instance to be running..."
@@ -186,7 +190,7 @@ PUBLIC_DNS=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=bastion-rds" "Name=instance-state-name,Values=running" \
   --query "Reservations[].Instances[].PublicDnsName" --output text)
   
-echo $PUBLIC_DNS
+#echo $PUBLIC_DNS
 #echo $MY_IP_ADDRESS
 #echo $PRIVATE_IP
 
@@ -240,14 +244,12 @@ aws rds create-db-instance \
   --engine MySQL \
   --db-instance-identifier lambdaRDS \
   --db-instance-class db.t2.micro \
-  --publicly-accessible \
   --allocated-storage 5 \
   --backup-retention-period 3 \
-  --publicly-accessible \
   --vpc-security-group-ids "$SECURITY_GROUP_ID" \
   --db-subnet-group-name lambdaRdsSubnetGroup \
-  --master-username admin \
-  --master-user-password supersecret \
+  --master-username $RDS_USER \
+  --master-user-password $RDS_PASSWORD \
   --no-cli-pager
 echo "  RDS MySQL instance created."
 
@@ -261,15 +263,23 @@ RDS_ENDPOINT=$(aws rds describe-db-instances \
   --db-instance-identifier lambdaRDS \
   --query DBInstances[*].Endpoint.Address --output text)
 
-# Write rds uri endpoint to rds_host.py
-echo "uri_string = \"$RDS_ENDPOINT\"" > ./deploy/rds_host.py
+#### CREATE .py config files for lambda to connect to RDS instance ####
+# Write rds uri endpoint to deploy/rds_host.py
+echo "# uri_string =  \"<db-instance-name>.<account-region-specific-hash>.<region-id>.rds.amazonaws.com\"" > ./deploy/rds_host.py
+echo "uri_string = \"$RDS_ENDPOINT\"" >> ./deploy/rds_host.py
+
+# Write rds instance config to deploy/rds_config.py
+echo "#config file containing credentials for RDS MySQL instance" > ./deploy/rds_config.py
+echo "db_username = \"$RDS_USER\"" >> ./deploy/rds_config.py
+echo "db_password = \"$RDS_PASSWORD\"" >> ./deploy/rds_config.py
+echo "db_name = \"$RDS_DATABASE_NAME\"" >> ./deploy/rds_config.py
 
 # disable strict host key checking (so script can run non-interactively)
 ssh -i bastion-rds.pem -o "StrictHostKeyChecking no" ubuntu@$PUBLIC_DNS exit
 # copy over sql script
 scp -i bastion-rds.pem db.sql ubuntu@$PUBLIC_DNS:~/
 # run sql script
-ssh -i bastion-rds.pem ubuntu@$PUBLIC_DNS mysql -h $RDS_ENDPOINT  --user=admin --password=supersecret < db.sql
+ssh -i bastion-rds.pem ubuntu@$PUBLIC_DNS mysql -h $RDS_ENDPOINT  --user=$RDS_USER --password=$RDS_PASSWORD < db.sql
 
 # Get IAM role arn (for Lambda function)
 ROLE_ARN=$(aws iam get-role --role-name lambda-vpc-role  --query 'Role.Arn' --output text)

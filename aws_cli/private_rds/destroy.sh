@@ -29,7 +29,7 @@ INSTANCE_ID=$(aws ec2 describe-instances \
   --query "Reservations[].Instances[].InstanceId" \
   --output text)
 
-echo $INSTANCE_ID
+#echo $INSTANCE_ID
 
 # Terminate bastion ec2 instance
 echo "Terminating ec2 bastion instance..."
