@@ -412,15 +412,40 @@ resource "aws_api_gateway_integration" "get_users_integration" {
   uri                     = aws_lambda_function.rds_lambda.invoke_arn
 }
 
-# Lambda
-resource "aws_lambda_permission" "apigw_lambda" {
-  statement_id  = "AllowExecutionFromAPIGateway"
+resource "aws_api_gateway_method" "post_users" {
+  rest_api_id   = aws_api_gateway_rest_api.lambda_rds.id
+  resource_id   = aws_api_gateway_resource.lambda_rds_users.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "post_users_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.lambda_rds.id
+  resource_id             = aws_api_gateway_resource.lambda_rds_users.id
+  http_method             = aws_api_gateway_method.post_users.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.rds_lambda.invoke_arn
+}
+
+resource "aws_lambda_permission" "apigw_lambda_get" {
+  statement_id  = "AllowGetFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.rds_lambda.function_name
   principal     = "apigateway.amazonaws.com"
 
   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
   source_arn = "arn:aws:execute-api:us-east-1:486322999195:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.get_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
+}
+
+resource "aws_lambda_permission" "apigw_lambda_post" {
+  statement_id  = "AllowPostFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.rds_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
+  source_arn = "arn:aws:execute-api:us-east-1:486322999195:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.post_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
 }
 
 resource "aws_api_gateway_deployment" "users_deploy" {
@@ -438,6 +463,8 @@ resource "aws_api_gateway_deployment" "users_deploy" {
       aws_api_gateway_resource.lambda_rds_users.id,
       aws_api_gateway_method.get_users.id,
       aws_api_gateway_integration.get_users_integration.id,
+      aws_api_gateway_method.post_users.id,
+      aws_api_gateway_integration.post_users_integration.id,
     ]))
   }
 
