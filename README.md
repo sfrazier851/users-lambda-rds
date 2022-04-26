@@ -63,7 +63,7 @@ Spin up a serverless REST API. Uses API Gateway, Lambda and RDS (MySQL).
     - ```terrafrom14 plan```
     - ```terraform14 apply```
 
-2.  Wait about 8-12 minutes after script completes.
+2.  Wait about 8-12 minutes after automation completes.
 
 3.  Confirm Deployment
     - ```./curl_test.sh```
