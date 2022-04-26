@@ -27,6 +27,14 @@ Spin up a serverless REST API. Uses API Gateway, Lambda and RDS (MySQL).
 8.  Confirm Configure
     - ```aws sts get-caller-identity```
 
+9.  Download Terraform, Unzip & Add to Path
+    - https://releases.hashicorp.com/terraform/0.14.11/terraform_0.14.11_darwin_amd64.zip
+    - ```unzip terraform_0.14.11_darwin_amd64.zip```
+    - ```mv terraform /usr/local/bin/terraform14```
+
+10. Confirm Install
+    - ```terraform14 --version```
+
 -------------------------
 
 ### Run AWS CLI Automation, Test and Teardown
@@ -42,3 +50,20 @@ Spin up a serverless REST API. Uses API Gateway, Lambda and RDS (MySQL).
 
 4.  Teardown
     - ```./destroy.sh```
+
+-------------------------
+
+### Run Terraform Automation, Test and Teardown
+
+1.  Navigate to ```users-lambda-rds/terraform```
+    - ```terraform14 init```
+    - ```terrafrom14 plan```
+    - ```terraform14 apply```
+
+2.  Wait about 8-12 minutes after script completes.
+
+3.  Confirm Deployment
+    - ```./curl_test.sh```
+
+4.  Teardown
+    - ```terraform14 destroy```
