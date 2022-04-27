@@ -55,8 +55,8 @@ Spin up a serverless REST API. Uses API Gateway, Lambda and RDS (MySQL).
 
 ### Run Terraform Automation, Test and Teardown
 ###### NOTE: create S3 bucket for remote state storage and dynamodb table for state locking:
-    aws s3 mb s3://user-lambda-rds-tfstate
-    aws dynamodb create-table --table-name terraform-dev-state-table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1
+   - ```aws s3 mb s3://user-lambda-rds-tfstate```
+   - ```aws dynamodb create-table --table-name terraform-dev-state-table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1```
 
 1.  Navigate to ```users-lambda-rds/terraform```
     - ```terraform14 init```
