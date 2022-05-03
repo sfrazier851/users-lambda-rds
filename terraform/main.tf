@@ -32,9 +32,14 @@ terraform {
 
 # Provider Block
 provider "aws" {
-  region  = "us-east-1"
   profile = "default"
 }
+
+# Get the default region
+data "aws_region" "current" {}
+
+# Get the caller identity (used to access the account id)
+data "aws_caller_identity" "current" {}
 
 resource "aws_vpc" "rds_lambda_apig" {
   cidr_block           = "10.0.0.0/16"
@@ -50,7 +55,7 @@ resource "aws_vpc" "rds_lambda_apig" {
 resource "aws_subnet" "private_rds1" {
   vpc_id            = aws_vpc.rds_lambda_apig.id
   cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-east-1a"
+  availability_zone = "${data.aws_region.current.name}a"
 
   tags = {
     Name = "private_rds1"
@@ -60,7 +65,7 @@ resource "aws_subnet" "private_rds1" {
 resource "aws_subnet" "private_rds2" {
   vpc_id            = aws_vpc.rds_lambda_apig.id
   cidr_block        = "10.0.2.0/24"
-  availability_zone = "us-east-1b"
+  availability_zone = "${data.aws_region.current.name}b"
 
   tags = {
     Name = "private_rds2"
@@ -70,7 +75,7 @@ resource "aws_subnet" "private_rds2" {
 resource "aws_subnet" "public_bastion" {
   vpc_id            = aws_vpc.rds_lambda_apig.id
   cidr_block        = "10.0.3.0/24"
-  availability_zone = "us-east-1a"
+  availability_zone = "${data.aws_region.current.name}a"
 
   map_public_ip_on_launch = true
 
@@ -435,7 +440,7 @@ resource "aws_lambda_permission" "apigw_lambda_get" {
   principal     = "apigateway.amazonaws.com"
 
   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
-  source_arn = "arn:aws:execute-api:us-east-1:486322999195:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.get_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
+  source_arn = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.get_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
 }
 
 resource "aws_lambda_permission" "apigw_lambda_post" {
@@ -445,7 +450,7 @@ resource "aws_lambda_permission" "apigw_lambda_post" {
   principal     = "apigateway.amazonaws.com"
 
   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
-  source_arn = "arn:aws:execute-api:us-east-1:486322999195:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.post_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
+  source_arn = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${aws_api_gateway_rest_api.lambda_rds.id}/*/${aws_api_gateway_method.post_users.http_method}${aws_api_gateway_resource.lambda_rds_users.path}"
 }
 
 resource "aws_api_gateway_deployment" "users_deploy" {
